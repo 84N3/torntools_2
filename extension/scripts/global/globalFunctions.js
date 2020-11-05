@@ -395,4 +395,66 @@ function showLoadingPlaceholder(element, show) {
 	}
 }
 
-function verifyAPI(key) {}
+function changeAPIKey(key) {
+	return new Promise((resolve, reject) => {
+		fetchApi("torn", { section: "user", selections: ["profile"], key, silent: true })
+			.then(async () => {
+				await ttStorage.change({ api: { torn: { key } } });
+
+				chrome.runtime.sendMessage({ action: "initialize" }, async () => {
+					resolve();
+				});
+			})
+			.catch((error) => {
+				reject(error.error);
+			});
+	});
+}
+
+function toSeconds(milliseconds) {
+	if (!milliseconds) return toSeconds(Date.now());
+	else if (typeof milliseconds === "object" && milliseconds instanceof Date) return toSeconds(milliseconds.getTime());
+	else if (!isNaN(milliseconds)) return Math.trunc(milliseconds / 1000);
+	else return toSeconds(Date.now());
+}
+
+function toMultipleDigits(number, digits = 2) {
+	if (number === undefined) return undefined;
+	return number.toString().length < digits ? toMultipleDigits(`0${number}`, digits) : number;
+}
+
+function formatTime(time = {}, attributes = {}) {
+	time = {
+		milliseconds: undefined,
+		seconds: undefined,
+		...time,
+	};
+	attributes = {
+		type: "normal",
+		showDays: false,
+		hideHours: false,
+		hideSeconds: false,
+		...attributes,
+	};
+
+	switch (attributes.type) {
+		case "timer":
+			let date;
+			if (isDefined(time.milliseconds)) date = new Date(time.milliseconds);
+			else if (isDefined(time.seconds)) date = new Date(time.seconds * 1000);
+
+			let parts = [];
+			if (attributes.showDays) parts.push(Math.floor(date.getTime() / TO_MILLIS.DAYS));
+			if (!attributes.hideHours) parts.push(date.getUTCHours());
+			parts.push(date.getUTCMinutes());
+			if (!attributes.hideSeconds) parts.push(date.getUTCSeconds());
+
+			return parts.map((p) => toMultipleDigits(p, 2)).join(":");
+		default:
+			return -1;
+	}
+}
+
+function isDefined(object) {
+	return typeof object !== "undefined";
+}
